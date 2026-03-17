@@ -1,0 +1,218 @@
+---
+title: "Practical: Antigenic cartography using Racmacs"
+output: html_document
+date: "2024-03-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+## Introduction
+
+Today we will be learning how to make an antigenic map, check its quality and 
+
+First, let's install Racmacs, if you don't already have it, and then load the library
+
+```{r get-racmacs}
+# install.packages("Racmacs")
+```
+
+```{r answer-library}
+
+```
+
+## Making a map
+
+### Reading in data
+
+First we need to read some data in. The way to read data in depends on the format. There is a file "small-dataset.csv" in the data folder
+
+```{r answer-readin}
+
+```
+
+### Making a map
+
+You can make the map directly from the table (make.acmap) or from an acmap object (optimizeMap) created using the function acmap. These methods are effectively equivalent. If you're not confident in R, you can use the GUI for some tasks:runGUI() 
+
+If you want to get the same results as me, set you random seed to 5387 before making your map.
+
+```{r answer-make-map}
+ran_seed <- 5387
+
+```
+
+If you have a sensible reason, you can fix the column base, or set a minimum column base. You can also make a map in more dimensions. Can you make a 3d map?
+
+```{r answer-3d-map}
+
+```
+
+### Saving your map
+
+You can save your map & open maps using the commands save.acmap and read.acmap, or using the GUI
+
+```{r answer-save-map}
+
+```
+
+## Plotting/viewing a map
+
+You can plot and view your map using the functions plot and view.
+
+```{r answer-plot-view}
+
+```
+
+## Quality 
+
+### Viewer features (connection lines, error lines, stress dots)
+
+From the "Coloring" tab you can colour by stress; higher stress points are ones where the antigenic map fits the data less well.
+
+From the "Diagnostics" tab, you can select an antigen and turn on 
+
+* connection lines (button "C" or ctrl-c) which show which sera have been titrated against that antigen
+* error lines (button "E" or ctrl-e) which show the error in positioning. Red is too close and blue is too far. If both the antigen and sera are moved to the end of their line then there would be no difference between the map and table distances for that measurement.
+* titre values (no button, ctrl-t)
+
+**Which antigen and serum have the highest average stress?**
+
+*ANSWER: *
+
+### Hemisphering
+
+If points are poorly coordinated, they can move substantially without having much effect on the stress. Because they flip from one side on the map to the other, we call this hemisphering.
+
+```{r hemi}
+hemi_check <- checkHemisphering(map_2d_100)
+
+view(hemi_check)
+```
+
+**Can you use the connection lines to explain why these points are hemisphered?**
+
+*ANSWER: *
+
+### Procrustes
+
+We use procrustes to compare two maps with antigens & sera in common.
+
+First, we need to get another map to compare with (in that I need to remoce the antigen & serum IDs from the 2004 map so that the algorithm matches by name).
+
+```{r get-2004-map}
+map_2004 <- read.acmap("data/seq-t9a-mod27.ace")
+srIDs(map_2004) <- rep("", numSera(map_2004))
+agIDs(map_2004) <- rep("", numAntigens(map_2004))
+```
+
+Perform and view the procrustes of your map with the published map_2004, using the function procrustesMap
+
+```{r answer-procrustes}
+
+```   
+
+**Describe the changes you see. Why do you think these occur?**
+
+*ANSWER: *
+
+### Point uncertainty (blob)
+
+Point uncertainty can be visualised using bootsrapping where data is randomly excluded and the map re-made. Here I've used the default parameters of 1000 repeats and 100 optimisations per repeat. I've commented out the code as it might take a while to run on your machine - you can simply load the completed map for plotting.
+
+There's more detail on the bootstrapping methods [here](https://acorg.github.io/Racmacs/articles/assessing_map_uncertainty.html)
+
+```{r blob}
+# set.seed(ran_seed)
+# bs_map <-bootstrapMap(map_2d_100, method = "resample")
+# save.acmap(bs_map, "out/bs_map.ace")
+# blob95 <- bootstrapBlobs(bs_map, , conf.level=0.95)
+# blob68 <- bootstrapBlobs(bs_map)
+# blob10 <- bootstrapBlobs(bs_map, conf.level=0.1)
+# save.acmap(blob95, "out/blob95_map.ace")
+# save.acmap(blob68, "out/blob68_map.ace")
+# save.acmap(blob10, "out/blob10_map.ace")
+
+blob68 <- read.acmap("out/blob68_map.ace")
+plot(blob68, plot_stress=T)
+view(blob68)
+
+blob10 <- read.acmap("out/blob10_map.ace")
+plot(blob10, plot_stress=T)
+view(blob10)
+```
+
+**How do you interpret these?**
+
+*ANSWER: *
+
+### Dimension testing
+
+```{r dim-stress}
+mapStress(map_2d_100)
+mapStress(map_3d_100)
+```
+
+**How do you interpret this result? Can you tell which map is better?**
+
+*ANSWER: *
+
+By removing data, we can test how well this removed data is predicted by maps with differing numbers of dimensions (cross-validation). The default setting test 1-5 dimesions, removing 10% of the data, 1000 optimisation and 100 replicates per dimension. Here I've saved the output of the code as it takes a while to run.
+
+```{r dim-test}
+# dim_test <- dimensionTestMap(map_2d_100)
+# save(dim_test, file="out/dim_test.RData")
+
+load("out/dim_test.RData")
+dim_test
+
+#plotting for detectable titres
+ci <- 1.96*sqrt(dim_test$var_rmse_detectable/100)
+plot(dim_test$dimensions, dim_test$mean_rmse_detectable, ylim=range(c(dim_test$mean_rmse_detectable+ci, dim_test$mean_rmse_detectable-ci)))
+arrows(dim_test$dimensions, dim_test$mean_rmse_detectable+ci, dim_test$dimensions, dim_test$mean_rmse_detectable-ci, length=0.1, angle=90, code=3)
+```
+
+Can you make the same plot for the nondetectable titres (titres below threshold, like <10)?
+
+```{r answer-dim-test}
+
+```
+
+**How do you interpret this output?**
+
+*ANSWER: *
+
+## Genetic basis
+
+Sequence data is added as a matrix, so if you start with a fasta file you will need to do a little pre-processing (aligning and trimming your sequences & then changing from a list to a matrix). You may need to change the code below depending on the name you have used for your map.
+
+If you haven't already done this, then you need to rename your sera as the "/" get converted to "." when the file is read in (the first line of code does this, but you may need to change the variable name).
+
+```{r seq data}
+srNames(map_2d_100) <- gsub(".", "/", srNames(map_2d_100), fixed=T) 
+
+ag_sequences <- read.csv(
+  file = system.file("extdata/h3map2004_sequences_ag.csv", package = "Racmacs"),
+  colClasses = "character",
+  row.names = 1
+)
+
+sr_sequences <- read.csv(
+  file = system.file("extdata/h3map2004_sequences_sr.csv", package = "Racmacs"),
+  colClasses = "character",
+  row.names = 1
+)
+
+agSequences(map_2d_100) <- ag_sequences[agNames(map_2d_100),]
+srSequences(map_2d_100) <- sr_sequences[srNames(map_2d_100),]
+```
+
+Now view the map and colour by sequence.
+
+**Which amino acids could be responsible for the antigenic differences? How could you be sure?**
+
+*ANSWER: *
+
+
+
